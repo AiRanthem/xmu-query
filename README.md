@@ -65,12 +65,26 @@ mvn clean compile install
 然后在目标项目中添加依赖。注意：该依赖包含了 `mybatis-plus-boot-starter`
 
 ```xml
-
 <dependency>
     <groupId>cn.airanthem.xmu</groupId>
     <artifactId>xmu-query-boot-starter</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
+```
+
+最后不要忘了在启动类上标注Bybatis的`MapperScan`。后面的所有`Mapper`要写在这个包里（给没用过mybatis的同学强调）
+
+```java
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+@MapperScan("your.mapper.package")
+class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
 ```
 
 ## Quick Start
