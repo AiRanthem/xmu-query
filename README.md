@@ -57,7 +57,7 @@
 首先在本地maven仓库进行安装
 
 ```shell
-git clone http://out.gitlab.airanthem.cn/AiRanthem/xmu-query.git
+git clone https://github.com/AiRanthem/xmu-query.git
 cd xmu-query
 mvn clean compile install
 ```
