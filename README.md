@@ -145,7 +145,7 @@ interface StudentMapper extends BaseEntityMapper<Student> {
 
 ```java
 import cn.airanthem.xmu.query.base.QueryResult;
-import cn.airanthem.xmu.query.facade.XmuQuery;
+import cn.airanthem.xmu.query.base.XmuQuery;
 
 @Service
 class SomeService() {
@@ -196,15 +196,11 @@ class SomeService() {
 首先为主表编写实体类，副表不需要考虑。
 
 ```java
-import cn.airanthem.xmu.query.annotation.Id;
 import cn.airanthem.xmu.query.annotation.Relation;
 import cn.airanthem.xmu.query.base.BaseEntity;
 import com.baomidou.mybatisplus.annotation.TableField;
 
 class Course extends BaseEntity {
-    // 标注为Id的字段无法导出
-    @Id
-    private Long cid;
 
     // 可以通过MP的标准注解来指定列。
     @TableField(value = "course_no")
@@ -235,7 +231,7 @@ interface CourseMapper extends BaseEntityMapper<Course> {
 
 ```java
 import cn.airanthem.xmu.query.base.QueryResult;
-import cn.airanthem.xmu.query.facade.XmuQuery;
+import cn.airanthem.xmu.query.base.XmuQuery;
 
 @Service
 class SomeService() {

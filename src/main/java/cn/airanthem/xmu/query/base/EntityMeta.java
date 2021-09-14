@@ -14,7 +14,6 @@ import java.util.Map;
  */
 @Data
 public class EntityMeta {
-    Field idField;
     Map<String, RelationField> relationFields = new HashMap<>();
     Map<String, Field> plainFields = new HashMap<>();
 }

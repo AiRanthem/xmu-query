@@ -1,6 +1,7 @@
 package cn.airanthem.xmu.query.base;
 
 import cn.airanthem.xmu.query.fake.DemoEntity;
+import cn.airanthem.xmu.query.utils.QueryUtils;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,10 +11,7 @@ class BaseEntityTest {
 
     @Test
     void getEntityMeta() {
-        EntityMeta entityMeta = BaseEntity.getEntityMeta(DemoEntity.class);
-        assertEquals(
-                "id", entityMeta.getIdField().getName()
-        );
+        EntityMeta entityMeta = QueryUtils.getEntityMeta(DemoEntity.class);
         assertEquals(
                 1, entityMeta.getRelationFields().size()
         );

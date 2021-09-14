@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -17,7 +18,7 @@ public class DemoEntityMapperImpl implements DemoEntityMapper{
 
     @Override
     public List<Map<String, Object>> selectResourceByColumn(String table, String column, String value) {
-        return null;
+        return Collections.emptyList();
     }
 
     @Override

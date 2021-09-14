@@ -1,13 +1,11 @@
-package cn.airanthem.xmu.query.facade;
+package cn.airanthem.xmu.query.base;
 
-import cn.airanthem.xmu.query.base.BaseEntity;
-import cn.airanthem.xmu.query.base.Buffer;
-import cn.airanthem.xmu.query.base.EntityMeta;
-import cn.airanthem.xmu.query.base.QueryResult;
-import cn.airanthem.xmu.query.base.RelationField;
 import cn.airanthem.xmu.query.enums.BiLogic;
 import cn.airanthem.xmu.query.enums.OrderTypeEnum;
+import cn.airanthem.xmu.query.factory.BaseEntityFactory;
+import cn.airanthem.xmu.query.factory.NullFactory;
 import cn.airanthem.xmu.query.mapper.BaseEntityMapper;
+import cn.airanthem.xmu.query.utils.QueryUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.common.collect.Sets;
@@ -17,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,17 +32,25 @@ public class XmuQuery<T extends BaseEntity> {
 
     private final EntityMeta meta;
 
+    private boolean emptyResult = false;
+
+    private final BaseEntityFactory<T> factory;
+
+    public final static String ID_COL = "id";
+
     public XmuQuery(BaseEntityMapper<T> mapper, Class<T> clazz) {
         this.mapper = mapper;
-        this.meta = BaseEntity.getEntityMeta(clazz);
+        this.meta = QueryUtils.getEntityMeta(clazz);
+        this.factory = new BaseEntityFactory<>(mapper, clazz, meta);
     }
 
     /**
-     * 复用缓存的元数据减少反射的构造器
+     * 复用缓存的元数据减少反射的构造器。注意：这种构造器构造的XmuQuery无法用于插入任务。
      */
     public XmuQuery(BaseEntityMapper<T> mapper, EntityMeta meta) {
         this.mapper = mapper;
         this.meta = meta;
+        factory = new NullFactory<>();
     }
 
     /**
@@ -148,37 +155,49 @@ public class XmuQuery<T extends BaseEntity> {
      * 构造关联索引的 AND 条件
      */
     public XmuQuery<T> relationQueryAnd(String table, String column, String field, Object value) {
-        wrapper.and(w -> relationQueryPart(w, table, column, field, value));
-        return this;
+        return relationQuery(table, column, field, value, BiLogic.AND);
     }
 
     /**
      * 构造关联索引的 OR 条件
      */
     public XmuQuery<T> relationQueryOr(String table, String column, String field, Object value) {
-        wrapper.or(w -> relationQueryPart(w, table, column, field, value));
-        return this;
+        return relationQuery(table, column, field, value, BiLogic.OR);
     }
 
     /**
      * 构造关联索引的 NOT 条件
      */
     public XmuQuery<T> relationQueryNot(String table, String column, String field, Object value) {
-        wrapper.not(w -> relationQueryPart(w, table, column, field, value));
-        return this;
+        return relationQuery(table, column, field, value, BiLogic.NOT);
     }
 
-    private void relationQueryPart(QueryWrapper<?> w, String table, String column, String field, Object value) {
-        for (Long relatedId : getRelatedIds(table, column, value)) {
-            w.or().like(field, relatedId);
+    public XmuQuery<T> relationQuery(String table, String column, String field, Object value, BiLogic logic) {
+        List<Long> relatedIds = getRelatedIds(table, column, value);
+        if (!relatedIds.isEmpty()) {
+            switch (logic) {
+                case AND:
+                    wrapper.and(w -> QueryUtils.relationQueryPart(w, field, relatedIds));
+                    break;
+                case OR:
+                    wrapper.or(w -> QueryUtils.relationQueryPart(w, field, relatedIds));
+                    break;
+                case NOT:
+                    wrapper.not(w -> QueryUtils.relationQueryPart(w, field, relatedIds));
+                    break;
+            }
+        } else {
+            // 找不到对应的ID代表这个查询条件会导致返回空列表。
+            emptyResult = true;
         }
+        return this;
     }
 
     private List<Long> getRelatedIds(String table, String column, Object value) {
         List<Map<String, Object>> relatedData = queryDbByColumn(table, column, value.toString());
         ArrayList<Long> ids = new ArrayList<>();
         for (Map<String, Object> relatedDatum : relatedData) {
-            Long id = parseId(relatedDatum.get("id"));
+            Long id = QueryUtils.parseId(relatedDatum.get(ID_COL));
             Buffer.updateBuffer(table, id, relatedDatum);
             ids.add(id);
         }
@@ -209,12 +228,16 @@ public class XmuQuery<T extends BaseEntity> {
      * 分页获取对象，排序
      */
     public QueryResult<T> getPage(Integer pageNo, Integer pageSize, String orderCol, OrderTypeEnum orderType) {
-        order(orderCol, orderType);
-        Page<T> page = mapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-        page.getRecords().forEach(
-                r -> r.setBaseEntityMapper(mapper)
-        );
-        return new QueryResult<>(page.getRecords(), page.getTotal(), meta);
+        orderBy(orderCol, orderType);
+        if (!emptyResult) {
+            Page<T> page = mapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+            page.getRecords().forEach(
+                    r -> r.setBaseEntityMapper(mapper)
+            );
+            return new QueryResult<>(page.getRecords(), page.getTotal(), meta);
+        } else {
+            return new QueryResult<>(Collections.emptyList(), 0L, meta);
+        }
     }
 
     /**
@@ -228,8 +251,8 @@ public class XmuQuery<T extends BaseEntity> {
      * 获取所有对象，排序
      */
     public QueryResult<T> getAll(String orderCol, OrderTypeEnum orderType) {
-        order(orderCol, orderType);
-        List<T> records = mapper.selectList(wrapper);
+        orderBy(orderCol, orderType);
+        List<T> records = emptyResult ? Collections.emptyList() : mapper.selectList(wrapper);
         records.forEach(r -> r.setBaseEntityMapper(mapper));
         return new QueryResult<>(records, ((long) records.size()), meta);
     }
@@ -237,7 +260,7 @@ public class XmuQuery<T extends BaseEntity> {
     /**
      * 构造排序条件
      */
-    public void order(String col, OrderTypeEnum type) {
+    public XmuQuery<T> orderBy(String col, OrderTypeEnum type) {
         if (col != null) {
             if (type == OrderTypeEnum.ASC) {
                 wrapper.orderByAsc(col);
@@ -245,6 +268,7 @@ public class XmuQuery<T extends BaseEntity> {
                 wrapper.orderByDesc(col);
             }
         }
+        return this;
     }
 
     private List<Object> getValues(String table, String column, List<Long> ids) {
@@ -253,30 +277,40 @@ public class XmuQuery<T extends BaseEntity> {
             Map<String, Object> buf = Buffer.queryBufById(table, id);
             if (buf == null) {
                 buf = queryDbById(table, id);
+                if (buf == null) {
+                    LOG.error(String.format("dirty data: id %d not exist for table %s", id, table));
+                    continue;
+                }
                 Buffer.updateBuffer(table, id, buf);
             }
             Object val = buf.get(column);
             if (val == null) {
-                throw new RuntimeException(String.format("table %s doesn't have column %s", table, column));
+                LOG.error(String.format("bad entity: table %s doesn't have column %s", table, column));
+                continue;
             }
             values.add(val);
         }
         return values;
     }
 
-    private Long parseId(Object idObj) {
-        try {
-            return (Long) idObj;
-        } catch (Exception e) {
-            return ((Integer) idObj).longValue();
-        }
-    }
-
-    private List<Map<String, Object>> queryDbByColumn(String table, String column, String value) {
+    public List<Map<String, Object>> queryDbByColumn(String table, String column, String value) {
         return mapper.selectResourceByColumn(table, column, value);
     }
 
-    private Map<String, Object> queryDbById(String table, Long id) {
+    public Map<String, Object> queryDbById(String table, Long id) {
         return mapper.selectResourceById(table, id);
+    }
+
+    public void insertMaps(List<Map<String, Object>> lm) {
+        Map<String, RelationField> relationFields = meta.getRelationFields();
+
+        for (Map<String, Object> map : lm) {
+            // todo insert sub tables
+            T instance = factory.getFromMap(map);
+            if (instance != null) {
+                mapper.insert(instance);
+            }
+        }
+
     }
 }

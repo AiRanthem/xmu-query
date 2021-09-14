@@ -1,14 +1,12 @@
-package cn.airanthem.xmu.query.facade;
+package cn.airanthem.xmu.query.query;
 
+import cn.airanthem.xmu.query.base.XmuQuery;
 import cn.airanthem.xmu.query.fake.DemoEntity;
 import cn.airanthem.xmu.query.fake.DemoEntityMapper;
 import cn.airanthem.xmu.query.fake.DemoEntityMapperImpl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
